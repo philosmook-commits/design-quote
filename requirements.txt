@@ -3,3 +3,4 @@ matplotlib
 gspread
 oauth2client
 streamlit
+fpdf2
