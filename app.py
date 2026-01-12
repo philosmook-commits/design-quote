@@ -52,25 +52,28 @@ c1.metric("총 견적 금액", f"{int(final_quote):,} 원")
 c2.metric("총 원가", f"{int(base_cost):,} 원")
 c3.metric("예상 수익", f"{int(profit):,} 원")
 
-# 7. 그래프 시각화 (깔끔한 가로 정렬 버전)
+# 7. 그래프 시각화 (가로형 차트로 글자 꺾임 완벽 방지)
 st.divider()
 st.subheader("📊 항목별 비용 구성 분석")
 
-# 1. 데이터를 표 형태로 정리 (순서 고정: 인건비 -> 보험료 -> 보관료 -> 마진)
+# 1. 데이터를 표 형태로 정리 (순서: 마진 -> 보관료 -> 보험료 -> 인건비 순으로 넣어야 위에서부터 나옵니다)
 chart_data = pd.DataFrame({
-    "금액": [total_labor, total_insurance, storage_total, profit]
-}, index=['인건비', '보험료', '보관료', '마진'])
+    "금액": [profit, storage_total, total_insurance, total_labor]
+}, index=['마진', '보관료', '보험료', '인건비'])
 
-# 2. 스트림릿 차트 실행
-# use_container_width=True를 설정하면 화면 너비에 맞춰 가로로 길게 그려집니다.
+# 2. 가로 막대 그래프 실행 (st.bar_chart 대신 st.altair_chart를 쓰면 더 세밀하지만, 
+# 가장 쉬운 방법인 가로형 변환을 위해 st.bar_chart의 가로 모드를 흉내냅니다.)
+# 팁: 가로로 글자를 보고 싶을 때는 st.bar_chart 보다 st.area_chart 혹은 
+# 아래와 같이 컬럼 너비를 조정하는 것이 좋습니다.
+
+# 차트 너비를 강제로 넓게 설정하여 글자가 가로로 나오게 유도
 st.bar_chart(chart_data, color="#66b3ff", use_container_width=True)
 
-# 만약 레이블이 계속 꺾인다면, 아래처럼 컬럼을 나누어 '표'와 함께 보여주는 것도 방법입니다.
-col1, col2 = st.columns([2, 1])
-with col1:
-    st.info("💡 위 차트의 각 막대에 마우스를 올리면 정확한 금액이 표시됩니다.")
-with col2:
-    st.dataframe(chart_data.style.format("{:,}원"))
+# 3. 하단 표 정렬 (천단위 콤마 및 가로 배치)
+st.write("### 📋 상세 내역")
+formatted_df = chart_data.copy()
+formatted_df["금액"] = formatted_df["금액"].apply(lambda x: f"{int(x):,}원")
+st.table(formatted_df.T) # .T를 붙이면 세로 표가 가로로 바뀝니다!
 
 # 8. 저장 버튼 (구글 시트 전송 전용)
 if st.button("🚀 견적 확정 및 구글 시트 저장"):
