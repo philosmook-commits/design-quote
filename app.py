@@ -52,21 +52,18 @@ c1.metric("총 견적 금액", f"{int(final_quote):,} 원")
 c2.metric("총 원가", f"{int(base_cost):,} 원")
 c3.metric("예상 수익", f"{int(profit):,} 원")
 
-# 7. 그래프 시각화 (한글 깨짐을 100% 방지하기 위해 영문 레이블 사용)
+# 7. 그래프 시각화 (스트림릿 내장 차트 사용 - 한글 완벽 지원)
 st.divider()
-st.subheader("📊 비용 구성 분석 (Cost Analysis)") # 제목은 스트림릿 텍스트라 한글 안 깨짐
+st.subheader("📊 항목별 비용 구성 분석")
 
-fig, ax = plt.subplots(figsize=(10, 4))
+# 데이터를 표 형태로 정리
+chart_data = pd.DataFrame({
+    "항목": ['인건비', '보험료', '보관료', '마진'],
+    "금액": [total_labor, total_insurance, storage_total, profit]
+})
 
-# 레이블을 깔끔한 영문 대문자로 변경
-labels = ['Labor', 'Insurance', 'Storage', 'Profit']
-values = [total_labor, total_insurance, storage_total, profit]
-
-ax.bar(labels, values, color=['#ff9999','#66b3ff','#99ff99','#ffcc99'])
-ax.set_title("Cost Structure Analysis")
-ax.set_ylabel("Amount (KRW)")
-
-st.pyplot(fig)
+# 스트림릿 내장 바 차트 실행 (한글이 깨지지 않습니다)
+st.bar_chart(data=chart_data, x="항목", y="금액", color="#66b3ff")
 
 # 8. 저장 버튼 (구글 시트 전송 전용)
 if st.button("🚀 견적 확정 및 구글 시트 저장"):
