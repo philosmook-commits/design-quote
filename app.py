@@ -52,16 +52,20 @@ c1.metric("총 견적 금액", f"{int(final_quote):,} 원")
 c2.metric("총 원가", f"{int(base_cost):,} 원")
 c3.metric("예상 수익", f"{int(profit):,} 원")
 
-# 7. 그래프 시각화 (한글 깨짐 방지를 위해 영문/한글 병기)
+# 7. 그래프 시각화 (한글 깨짐을 100% 방지하기 위해 영문 레이블 사용)
 st.divider()
+st.subheader("📊 비용 구성 분석 (Cost Analysis)") # 제목은 스트림릿 텍스트라 한글 안 깨짐
+
 fig, ax = plt.subplots(figsize=(10, 4))
 
-# 레이블을 영문으로 수정하여 어떤 환경에서도 글자가 보이게 합니다.
-labels = ['Labor(인건)', 'Insure(보험)', 'Storage(보관)', 'Margin(마진)']
+# 레이블을 깔끔한 영문 대문자로 변경
+labels = ['Labor', 'Insurance', 'Storage', 'Profit']
 values = [total_labor, total_insurance, storage_total, profit]
 
 ax.bar(labels, values, color=['#ff9999','#66b3ff','#99ff99','#ffcc99'])
-ax.set_title("Cost Structure (비용 구성)")
+ax.set_title("Cost Structure Analysis")
+ax.set_ylabel("Amount (KRW)")
+
 st.pyplot(fig)
 
 # 8. 저장 버튼 (구글 시트 전송 전용)
