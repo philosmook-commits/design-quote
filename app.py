@@ -2,6 +2,7 @@ import streamlit as st
 import pandas as pd
 import matplotlib.pyplot as plt
 import gspread
+import altair as alt
 from oauth2client.service_account import ServiceAccountCredentials
 from datetime import datetime
 
@@ -52,21 +53,29 @@ c1.metric("총 견적 금액", f"{int(final_quote):,} 원")
 c2.metric("총 원가", f"{int(base_cost):,} 원")
 c3.metric("예상 수익", f"{int(profit):,} 원")
 
-# 7. 그래프 시각화 (세로 막대형 + 글자 가로 정렬 최적화)
+# 7. 그래프 시각화 (글자 가로 방향 강제 고정 버전)
 st.divider()
 st.subheader("📊 항목별 비용 구성 분석")
 
-# 1. 데이터 정리 (원하시는 순서대로 배치)
+# 1. 데이터 정리
 chart_data = pd.DataFrame({
+    "항목": ['인건비', '보험료', '보관료', '마진'],
     "금액": [total_labor, total_insurance, storage_total, profit]
-}, index=['인건비', '보험료', '보관료', '마진'])
+})
 
-# 2. 세로 막대 그래프 실행
-# 차트 너비를 강제로 넓게(use_container_width=True) 설정하여 
-# 글자가 회전하지 않고 가로로 나올 공간을 확보합니다.
-st.bar_chart(chart_data, color="#66b3ff", use_container_width=True)
+# 2. Altair를 이용한 정밀 차트 생성
+chart = alt.Chart(chart_data).mark_bar(color="#66b3ff").encode(
+    x=alt.X('항목:N', sort=None, axis=alt.Axis(labelAngle=0)), # labelAngle=0 이 핵심입니다!
+    y=alt.Y('금액:Q'),
+    tooltip=['항목', '금액']
+).properties(
+    width='container', # 화면 너비에 맞춤
+    height=400
+)
 
-# 3. 하단 상세 내역 표 (이미지 76aef5에서 만족하셨던 가로 한 줄 형태)
+st.altair_chart(chart, use_container_width=True)
+
+# 3. 하단 상세 내역 표
 st.write("### 📋 상세 내역")
 formatted_data = pd.DataFrame(
     [[f"{int(total_labor):,}원", f"{int(total_insurance):,}원", f"{int(storage_total):,}원", f"{int(profit):,}원"]],
