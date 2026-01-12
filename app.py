@@ -10,6 +10,7 @@ from fpdf import FPDF
 # 1. 구글 시트 연결 함수 (Secrets 방식 적용)
 def connect_google_sheet():
     try:
+        # 스트림릿 웹 설정에 저장된 정보를 가져옵니다.
         creds_info = st.secrets["gcp_service_account"]
         scope = ["https://spreadsheets.google.com/feeds", "https://www.googleapis.com/auth/drive"]
         creds = ServiceAccountCredentials.from_json_keyfile_dict(creds_info, scope)
@@ -19,17 +20,17 @@ def connect_google_sheet():
         st.error(f"구글 시트 연결 오류: {e}")
         return None
 
-# 2. PDF 생성 함수 (한글 폰트 설정 포함)
+# 2. PDF 생성 함수 (Bytes 변환 오류 수정 버전)
 def generate_pdf(user_name, customer_name, final_quote, profit, total_labor, total_insurance, storage_total):
     pdf = FPDF()
     pdf.add_page()
     
-    # 한글 폰트 등록 (GitHub에 올린 font.ttf 파일 경로)
+    # 한글 폰트 등록 (GitHub에 올린 font.ttf 파일 사용)
     try:
-        pdf.add_font('Hangul', '', 'font.ttf', uni=True)
+        pdf.add_font('Hangul', '', 'font.ttf')
         pdf.set_font('Hangul', size=18)
     except:
-        # 폰트 파일이 없을 경우 기본 폰트 사용 (한글은 깨질 수 있음)
+        # 폰트 파일이 없을 경우 기본 폰트 사용
         pdf.set_font('Arial', size=18)
 
     # 견적서 내용 작성
@@ -44,19 +45,19 @@ def generate_pdf(user_name, customer_name, final_quote, profit, total_labor, tot
     pdf.cell(200, 10, txt=f"고객사: {customer_name}", ln=1)
     pdf.ln(5)
     
-    pdf.cell(200, 10, txt="---------------------------------------------------------------------------", ln=1)
+    pdf.cell(200, 10, txt="-"*50, ln=1)
     pdf.cell(100, 10, txt=f"1. 인건비 합계: {int(total_labor):,} 원", ln=1)
     pdf.cell(100, 10, txt=f"2. 보험료 합계: {int(total_insurance):,} 원", ln=1)
     pdf.cell(100, 10, txt=f"3. 보관료 합계: {int(storage_total):,} 원", ln=1)
-    pdf.cell(200, 10, txt="---------------------------------------------------------------------------", ln=1)
+    pdf.cell(200, 10, txt="-"*50, ln=1)
     
     pdf.set_font(size=14)
     pdf.cell(200, 15, txt=f"최종 견적 총액: {int(final_quote):,} 원", ln=1)
     pdf.set_font(size=10)
     pdf.cell(200, 10, txt=f"(예상 수익: {int(profit):,} 원 포함)", ln=1)
     
-    # 바이트 데이터로 변환하여 반환
-    return pdf.output()
+    # 핵심 수정: output() 결과를 bytes 타입으로 명확히 변환하여 반환
+    return bytes(pdf.output())
 
 # 3. 페이지 설정 및 제목
 st.set_page_config(page_title="물류 견적 시뮬레이터", layout="wide")
@@ -87,7 +88,7 @@ c1.metric("총 견적 금액", f"{int(final_quote):,} 원")
 c2.metric("총 원가", f"{int(base_cost):,} 원")
 c3.metric("예상 수익", f"{int(profit):,} 원")
 
-# 7. 그래프 시각화
+# 7. 그래프 시각화 (글자 가로 방향 강제 고정)
 st.divider()
 st.subheader("📊 항목별 비용 구성 분석")
 
@@ -130,12 +131,15 @@ with col_save:
             st.balloons()
 
 with col_pdf:
-    # PDF 데이터 생성
-    pdf_bytes = generate_pdf(user_name, customer_name, final_quote, profit, total_labor, total_insurance, storage_total)
-    
-    st.download_button(
-        label="📥 PDF 견적서 다운로드",
-        data=pdf_bytes,
-        file_name=f"견적서_{customer_name}_{datetime.now().strftime('%Y%m%d')}.pdf",
-        mime="application/pdf"
-    )
+    try:
+        # PDF 데이터 생성 호출
+        pdf_bytes = generate_pdf(user_name, customer_name, final_quote, profit, total_labor, total_insurance, storage_total)
+        
+        st.download_button(
+            label="📥 PDF 견적서 다운로드",
+            data=pdf_bytes,
+            file_name=f"견적서_{customer_name}.pdf",
+            mime="application/pdf"
+        )
+    except Exception as e:
+        st.error(f"PDF 생성 중 오류 발생: {e}")
