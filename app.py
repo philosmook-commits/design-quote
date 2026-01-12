@@ -5,11 +5,11 @@ import gspread
 import altair as alt
 from oauth2client.service_account import ServiceAccountCredentials
 from datetime import datetime
+from fpdf import FPDF
 
 # 1. 구글 시트 연결 함수 (Secrets 방식 적용)
 def connect_google_sheet():
     try:
-        # 스트림릿 웹 설정에 저장된 정보를 가져옵니다.
         creds_info = st.secrets["gcp_service_account"]
         scope = ["https://spreadsheets.google.com/feeds", "https://www.googleapis.com/auth/drive"]
         creds = ServiceAccountCredentials.from_json_keyfile_dict(creds_info, scope)
@@ -19,10 +19,44 @@ def connect_google_sheet():
         st.error(f"구글 시트 연결 오류: {e}")
         return None
 
-# 2. 한글 깨짐 방지 설정 (웹 서버 환경 대응)
-# 웹 서버에는 한글 폰트가 없으므로 그래프 요소를 영문으로 병기하거나 
-# 기본 폰트 설정을 초기화하여 □ 깨짐 현상을 최소화합니다.
-plt.rcParams['axes.unicode_minus'] = False 
+# 2. PDF 생성 함수 (한글 폰트 설정 포함)
+def generate_pdf(user_name, customer_name, final_quote, profit, total_labor, total_insurance, storage_total):
+    pdf = FPDF()
+    pdf.add_page()
+    
+    # 한글 폰트 등록 (GitHub에 올린 font.ttf 파일 경로)
+    try:
+        pdf.add_font('Hangul', '', 'font.ttf', uni=True)
+        pdf.set_font('Hangul', size=18)
+    except:
+        # 폰트 파일이 없을 경우 기본 폰트 사용 (한글은 깨질 수 있음)
+        pdf.set_font('Arial', size=18)
+
+    # 견적서 내용 작성
+    pdf.cell(200, 15, txt="물류 서비스 견적서", ln=1, align='C')
+    pdf.ln(10)
+    
+    try: pdf.set_font('Hangul', size=12)
+    except: pdf.set_font('Arial', size=12)
+    
+    pdf.cell(200, 10, txt=f"발행 일시: {datetime.now().strftime('%Y-%m-%d %H:%M:%S')}", ln=1)
+    pdf.cell(200, 10, txt=f"담당자: {user_name}", ln=1)
+    pdf.cell(200, 10, txt=f"고객사: {customer_name}", ln=1)
+    pdf.ln(5)
+    
+    pdf.cell(200, 10, txt="---------------------------------------------------------------------------", ln=1)
+    pdf.cell(100, 10, txt=f"1. 인건비 합계: {int(total_labor):,} 원", ln=1)
+    pdf.cell(100, 10, txt=f"2. 보험료 합계: {int(total_insurance):,} 원", ln=1)
+    pdf.cell(100, 10, txt=f"3. 보관료 합계: {int(storage_total):,} 원", ln=1)
+    pdf.cell(200, 10, txt="---------------------------------------------------------------------------", ln=1)
+    
+    pdf.set_font(size=14)
+    pdf.cell(200, 15, txt=f"최종 견적 총액: {int(final_quote):,} 원", ln=1)
+    pdf.set_font(size=10)
+    pdf.cell(200, 10, txt=f"(예상 수익: {int(profit):,} 원 포함)", ln=1)
+    
+    # 바이트 데이터로 변환하여 반환
+    return pdf.output()
 
 # 3. 페이지 설정 및 제목
 st.set_page_config(page_title="물류 견적 시뮬레이터", layout="wide")
@@ -53,29 +87,24 @@ c1.metric("총 견적 금액", f"{int(final_quote):,} 원")
 c2.metric("총 원가", f"{int(base_cost):,} 원")
 c3.metric("예상 수익", f"{int(profit):,} 원")
 
-# 7. 그래프 시각화 (글자 가로 방향 강제 고정 버전)
+# 7. 그래프 시각화
 st.divider()
 st.subheader("📊 항목별 비용 구성 분석")
 
-# 1. 데이터 정리
 chart_data = pd.DataFrame({
     "항목": ['인건비', '보험료', '보관료', '마진'],
     "금액": [total_labor, total_insurance, storage_total, profit]
 })
 
-# 2. Altair를 이용한 정밀 차트 생성
 chart = alt.Chart(chart_data).mark_bar(color="#66b3ff").encode(
-    x=alt.X('항목:N', sort=None, axis=alt.Axis(labelAngle=0)), # labelAngle=0 이 핵심입니다!
+    x=alt.X('항목:N', sort=None, axis=alt.Axis(labelAngle=0)),
     y=alt.Y('금액:Q'),
     tooltip=['항목', '금액']
-).properties(
-    width='container', # 화면 너비에 맞춤
-    height=400
-)
+).properties(width='container', height=400)
 
 st.altair_chart(chart, use_container_width=True)
 
-# 3. 하단 상세 내역 표
+# 8. 하단 상세 내역 표
 st.write("### 📋 상세 내역")
 formatted_data = pd.DataFrame(
     [[f"{int(total_labor):,}원", f"{int(total_insurance):,}원", f"{int(storage_total):,}원", f"{int(profit):,}원"]],
@@ -84,18 +113,29 @@ formatted_data = pd.DataFrame(
 )
 st.table(formatted_data)
 
-# 8. 저장 버튼 (구글 시트 전송 전용)
-if st.button("🚀 견적 확정 및 구글 시트 저장"):
-    sheet = connect_google_sheet()
-    if sheet:
-        new_row = [
-            datetime.now().strftime("%Y-%m-%d %H:%M:%S"),
-            user_name,
-            customer_name,
-            volume,
-            int(final_quote),
-            int(profit)
-        ]
-        sheet.append_row(new_row)
-        st.success(f"✅ '{customer_name}' 견적 데이터가 구글 시트에 기록되었습니다!")
-        st.balloons()
+# 9. 저장 및 PDF 다운로드 기능
+st.divider()
+col_save, col_pdf = st.columns(2)
+
+with col_save:
+    if st.button("🚀 견적 확정 및 구글 시트 저장"):
+        sheet = connect_google_sheet()
+        if sheet:
+            new_row = [
+                datetime.now().strftime("%Y-%m-%d %H:%M:%S"),
+                user_name, customer_name, volume, int(final_quote), int(profit)
+            ]
+            sheet.append_row(new_row)
+            st.success("✅ 구글 시트에 기록되었습니다!")
+            st.balloons()
+
+with col_pdf:
+    # PDF 데이터 생성
+    pdf_bytes = generate_pdf(user_name, customer_name, final_quote, profit, total_labor, total_insurance, storage_total)
+    
+    st.download_button(
+        label="📥 PDF 견적서 다운로드",
+        data=pdf_bytes,
+        file_name=f"견적서_{customer_name}_{datetime.now().strftime('%Y%m%d')}.pdf",
+        mime="application/pdf"
+    )
